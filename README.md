@@ -13,6 +13,6 @@ Install role dependencies `ansible-galaxy install -r roles/requirements.yml`
 
 Run `test.yml`.
 
- 
+If you want an endpoint, which will return the server's fingerprint check [here](https://github.com/JimakosOSX/leviathan/blob/main/roles/general/files/api.py) 
 ## TODO
 - Add WebRTC
