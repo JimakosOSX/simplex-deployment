@@ -1,0 +1,101 @@
+---
+- name: get executable 
+  ansible.builtin.uri:
+    url: https://api.github.com/repos/simplex-chat/simplexmq/releases/latest
+    return_content: true
+  register: url_content
+
+# to avoid unused info while running, we use no_log
+- name: save files needed in var
+  ansible.builtin.set_fact:
+    dl_files: "{{ dl_files + [ item['browser_download_url'] ] }}"
+  no_log: True 
+  loop: "{{ url_content.json.assets }}"
+
+- name: Download latest files
+  ansible.builtin.get_url:
+    url: "{{ item }}"
+    dest: /root/.simplex
+  loop: "{{ dl_files }}"
+  when: '"LICENSE" not in item'
+
+- name: find smp-server exec
+  ansible.builtin.find:
+    paths: /root/.simplex
+    patterns: "smp-server*"
+  register: smp_file_to_copy
+
+- name: find ntf-server exec
+  ansible.builtin.find:
+    paths: /root/.simplex
+    patterns: "ntf-server*"
+  register: ntf_file_to_copy
+
+- name: copy smp server to location
+  ansible.builtin.copy:
+    src: "{{ item.path }}"
+    dest: /usr/local/bin/smp-server
+    remote_src: yes
+    mode: 0755
+  loop: "{{ smp_file_to_copy.files }}"
+
+- name: copy ntf server to location
+  ansible.builtin.copy:
+    src: "{{ item.path }}"
+    dest: /usr/local/bin/ntf-server
+    remote_src: yes
+    mode: 0755
+  loop: "{{ ntf_file_to_copy.files }}"
+
+- name: Add smp user
+  ansible.builtin.user:
+    name: smp
+    state: present
+    create_home: true
+
+- name: Create needed directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    recurse: yes
+    owner: smp
+    group: smp
+  loop:
+    - /var/opt/simplex 
+    - /etc/opt/simplex
+
+- name: Permit traffic in default zone for needed ports
+  ansible.posix.firewalld:
+    zone: "{{ firewall_default_zone }}"
+    port: "{{ item }}"
+    permanent: true
+    state: enabled
+  loop: 
+    - "5233/tcp"
+    - "5233/udp"
+
+
+- name: copy systemd service file
+  ansible.builtin.template:
+    src: smp_server_service
+    dest: /etc/systemd/system/smp-server.service
+
+- name: systemd daemon reload
+  ansible.builtin.systemd:
+    daemon_reload: True
+
+- name: create dir that saves role info
+  ansible.builtin.file:
+    path: /root/.simplex
+    state: directory
+
+- name: smp server init
+  ansible.builtin.shell: 'su smp -c "/usr/local/bin/smp-server init -l --ip {{ ansible_ssh_host }} -y --password {{ simplex_password }}"'
+  args:
+    creates: /root/.simplex/smp-server-initialized
+
+- name: start and enable service
+  ansible.builtin.systemd:
+    name: smp-server
+    state: started
+    enabled: yes
