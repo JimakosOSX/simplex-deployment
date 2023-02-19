@@ -1,0 +1,4 @@
+---
+# most vars here are dummy values for you to replace
+simplex_password: "verystrongpassword"
+firewall_default_zone: drop

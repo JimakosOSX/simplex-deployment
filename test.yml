@@ -1,0 +1,17 @@
+---
+- name: simplex chat test deployment
+  remote_user: opc
+  become: yes
+  hosts: oracle
+  any_errors_fatal: true
+  vars_files:
+    - defaults/main.yml
+  vars:
+    dl_files: []
+
+  tags:
+    - simplex
+
+  roles:
+    - role: simplex-chat
+
